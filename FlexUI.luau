@@ -20,7 +20,7 @@ local DefaultTheme = {
 	WindowBackground                  = Color3.fromRGB(30, 30, 30),
 
 	TitleText                         = Color3.fromRGB(255, 255, 255),
-	titleTextSize                     = 14,
+	TitleTextSize                     = 14,
 
 	CloseButtonBackground             = Color3.fromRGB(45, 45, 45),
 	CloseButtonText                   = Color3.fromRGB(200, 200, 200),
@@ -137,7 +137,7 @@ function FlexUI.new(_settings)
 	title.Text = settings.titleText or "DEBUG MENU"
 	title.TextColor3 = self.Theme.TitleText
 	title.Font = Enum.Font.GothamBold
-	title.TextSize = self.Theme.titleTextSize
+	title.TextSize = self.Theme.TitleTextSize
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = mainFrame
 	
@@ -148,7 +148,7 @@ function FlexUI.new(_settings)
 	closeMenuBtn.BackgroundColor3 = self.Theme.CloseButtonBackground
 	closeMenuBtn.Text = "X"
 	closeMenuBtn.TextColor3 = self.Theme.CloseButtonText
-	closeMenuBtn.Font = Enum.Font.GothamBold
+	closeMenuBtn.Font = Enum.Font.Gotham
 	closeMenuBtn.TextSize = 12
 	closeMenuBtn.BorderSizePixel = 0
 	closeMenuBtn.Parent = mainFrame
