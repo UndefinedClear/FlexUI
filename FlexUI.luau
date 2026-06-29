@@ -20,6 +20,7 @@ local DefaultTheme = {
 	WindowBackground                  = Color3.fromRGB(30, 30, 30),
 
 	TitleText                         = Color3.fromRGB(255, 255, 255),
+	titleTextSize                     = 14,
 
 	CloseButtonBackground             = Color3.fromRGB(45, 45, 45),
 	CloseButtonText                   = Color3.fromRGB(200, 200, 200),
@@ -52,7 +53,8 @@ local NeonTheme = {
     ButtonBackground = Color3.fromRGB(30, 30, 35),
     ButtonHover = Color3.fromRGB(0, 255, 150),
     ButtonText = Color3.fromRGB(255, 255, 255),
-    TriggerBackground = Color3.fromRGB(0, 255, 150)
+    TriggerBackground = Color3.fromRGB(0, 255, 150),
+	titleTextSize = 10
 }
 
 -- 1. Таблица с дефолтными значениями
@@ -63,12 +65,12 @@ local settings = {
 	menuOpenButtonText = "UI"
 }
 
-local example_config = {
-    titleText = "Новый заголовок",
-	customTheme = DefaultTheme,
-    menuOpenByKey = true,
-	menuOpenButtonText = "BABFT"
-}
+-- local example_config = {
+--     titleText = "Новый заголовок",
+-- 	customTheme = DefaultTheme,
+--     menuOpenByKey = true,
+-- 	menuOpenButtonText = "BABFT"
+-- }
 
 -- titleText, menuOpenByKey, customTheme, menuOpenBindEnum
 -- Utils
@@ -135,7 +137,7 @@ function FlexUI.new(_settings)
 	title.Text = settings.titleText or "DEBUG MENU"
 	title.TextColor3 = self.Theme.TitleText
 	title.Font = Enum.Font.GothamBold
-	title.TextSize = 14
+	title.TextSize = settings.titleTextSize or 14
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = mainFrame
 	

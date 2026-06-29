@@ -1,27 +1,6 @@
 -- =======================================================
 -- БЕЗОПАСНОЕ ПОДКЛЮЧЕНИЕ ИНТЕРФЕЙСА (FlexUI UI)
 -- =======================================================
--- local function SaveLoad()
---     local success, FlexUICode = pcall(function()
---         return game:HttpGet("https://raw.githubusercontent.com/UndefinedClear/FlexUI/refs/heads/main/FlexUI.lua")
---     end)
-
---     if not success or not FlexUICode or FlexUICode == "" then
---         error("[Ошибка] Не удалось скачать интерфейс FlexUI. Проверь ссылку или интернет!")
---     end
-
---     local FlexUIFunc, compileError = loadstring(FlexUICode)
---     if not FlexUIFunc then
---         error("[Ошибка компиляции UI]: " .. tostring(compileError))
---     else
---         return FlexUIFunc
---     end
--- end
-
--- local Loader = loadstring(game:HttpGet("https://raw.githubusercontent.com/UndefinedClear/FlexUI/refs/heads/main/Loader.lua"))() -- или loadstring если это внешний скрипт
--- local FlexUIFunc = Loader.LoadFlex() -- Получаем функцию конструктора UI
--- local FlexUI = FlexUIFunc() -- Создаем экземпляр UI (если FlexUI возвращает таблицу/объект)
-
 local FlexUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/UndefinedClear/FlexUI/refs/heads/main/Loader.lua"))().LoadFlex()()
 
 local Players = game:GetService("Players")
@@ -39,10 +18,15 @@ local flying = false
 local isNoclip = false
 local isRunning = false
 local isInvisible = false
-local COOLDOWN = 3
 
 -- Ссылки на UI
 local flyToggleUi, noclipToggleUi, afkToggleUi, coordsLabelUi, invisToggleUi, walkspeedToggleUi
+
+-- AFK LINKS
+local afkCalculatorLabel_p1min, afkCalculatorLabel_p1h, afkCalculatorLabel_p12h, afkCalculatorLabel_p24h
+local gold_per_cycle = 130
+local time_per_cycle = 25
+local gps = gold_per_cycle / time_per_cycle -- Gold Per Second
 
 -- ТАБЛИЦА КООРДИНАТ АВТО-ФАРМА
 local points = {
@@ -55,9 +39,9 @@ local points = {
     Vector3.new(84.62, 40.19, 5280.32),
     Vector3.new(101.02, 35.91, 6397.15),
     Vector3.new(105.98, 113.97, 7323.42),
-    Vector3.new(174.08, 52.33, 7699.65),
+    Vector3.new(80.70, 45.54, 8066.15),
     Vector3.new(-50.83, -357.62, 9501.02)
-}
+} -- 11 pos
 
 local teams_spawn_points = {
     white = Vector3.new(-49.85, -9.70, -503.81),  --
@@ -170,6 +154,10 @@ end
 -- =======================================================
 -- AFK И КООРДИНАТЫ
 -- =======================================================
+local AFKCYCLEDELAY = 5 -- 5
+local COOLDOWN_EACH_TP = 2 -- 3
+local isCountedGold = false
+
 local function startAfkCycle()
     while isRunning do
         for i, targetPos in ipairs(points) do
@@ -180,7 +168,7 @@ local function startAfkCycle()
                 root.CFrame = CFrame.new(targetPos)
                 print(string.format("[AFK] Телепорт на точку %d: %s", i, tostring(targetPos)))
             end
-            task.wait(COOLDOWN)
+            task.wait(COOLDOWN_EACH_TP)
         end
         
         if isRunning then
@@ -190,7 +178,7 @@ local function startAfkCycle()
                 print("[AFK] Круг пройден. Перезагрузка персонажа...")
                 -- hum.Health = 0
                 player.CharacterAdded:Wait()
-                task.wait(5)
+                task.wait(AFKCYCLEDELAY)
             end
         end
     end
@@ -258,11 +246,12 @@ local neonTheme = {
     ButtonBackground = Color3.fromRGB(30, 30, 35),
     ButtonHover = Color3.fromRGB(0, 255, 150),
     ButtonText = Color3.fromRGB(255, 255, 255),
-    TriggerBackground = Color3.fromRGB(0, 255, 150)
+    TriggerBackground = Color3.fromRGB(0, 255, 150),
+    titleTextSize = 10
 }
 
 local config = {
-    titleText = "МЕНЮ РАЗРАБОТЧИКА",
+    titleText = "My Pleasure | By UndefinecClear",
 	customTheme = neonTheme,
     menuOpenByKey = true,
 	menuOpenButtonText = "BABFT"
@@ -271,7 +260,8 @@ local config = {
 
 local menu = FlexUI.new(config)
 
-menu:AddLabel("Управление читом и AFK-ботом", {
+-- Start UI
+menu:AddLabel("Управление читом", {
     Font = Enum.Font.GothamBold,
     TextSize = 11,
     TextColor = Color3.fromRGB(0, 255, 150)
@@ -283,10 +273,7 @@ coordsLabelUi = menu:AddLabel("Координаты: не зафиксирова
     Font = Enum.Font.Code
 })
 
-flyToggleUi = menu:AddToggle("Режим полета [P]", flying, function(state)
-    flying = state
-    print("[UI] Полет:", flying)
-end)
+menu:AddButton("Зафиксировать точку [E]", recordCoordinates)
 
 noclipToggleUi = menu:AddToggle("Ноуклип (Сквозь стены) [L]", isNoclip, function(state)
     isNoclip = state
@@ -294,11 +281,79 @@ noclipToggleUi = menu:AddToggle("Ноуклип (Сквозь стены) [L]", 
     print("[UI] Ноуклип:", isNoclip)
 end)
 
+flyToggleUi = menu:AddToggle("Режим полета [P]", flying, function(state)
+    flying = state
+    print("[UI] Полет:", flying)
+end)
+
+menu:AddTextBox("Скорость полета (дефолт: 50)...", function(text)
+    local n = tonumber(text)
+    if n then speed = n print("[Система] Скорость полета:", speed)
+    else print("[Ошибка] Введите число!") end
+end)
+
+walkspeedToggleUi = menu:AddToggle("Цикл WalkSpeed", isWalkSpeed, function(state)
+    isWalkSpeed = state
+    if state == false then
+        hum.WalkSpeed = 16        
+    end
+end)
+
+menu:AddTextBox("WalkSpeed (дефолт: 16)...", function(text)
+    local n = tonumber(text)
+    if n then walksspeedVar = n print("[Система] WalkSpeed:", walksspeedVar)
+    else print("[Ошибка] Введите число!") end
+end)
+
 invisToggleUi = menu:AddToggle("Невидимость для других [M]", isInvisible, function(state)
     isInvisible = state
     applyInvisibility(isInvisible)
     print("[UI] Невидимость:", isInvisible)
 end)
+
+
+
+
+-- AFK UI
+menu:AddLabel("Управление AFK-ботом", {
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    TextColor = Color3.fromRGB(0, 255, 150)
+})
+-- 130 Gold/25 seconds
+menu:AddLabel("AFK Profit:", {
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Font = Enum.Font.Code,
+    TextColor = Color3.fromRGB(255, 215, 0)    
+})
+
+afkCalculatorLabel_p1min = menu:AddLabel("Per minute: " .. math.floor(gps * 60) .. " Gold", {
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Height = 40,
+    Font = Enum.Font.Code,
+    TextColor = Color3.fromRGB(214, 219, 182)
+})
+
+afkCalculatorLabel_p1h = menu:AddLabel("Per 1 hour: " .. math.floor(gps * 3600) .. " Gold", {
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Height = 40,
+    Font = Enum.Font.Code,
+    TextColor = Color3.fromRGB(214, 219, 182)
+})
+
+afkCalculatorLabel_p12h = menu:AddLabel("Per 12 hours: " .. math.floor(gps * 43200) .. " Gold", {
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Height = 40,
+    Font = Enum.Font.Code,
+    TextColor = Color3.fromRGB(214, 219, 182)
+})
+
+afkCalculatorLabel_p24h = menu:AddLabel("Per 24 hours: " .. math.floor(gps * 86400) .. " Gold", {
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Height = 40,
+    Font = Enum.Font.Code,
+    TextColor = Color3.fromRGB(214, 219, 182)
+})
 
 afkToggleUi = menu:AddToggle("Авто AFK-цикл [J]", isRunning, function(state)
     isRunning = state
@@ -310,8 +365,12 @@ afkToggleUi = menu:AddToggle("Авто AFK-цикл [J]", isRunning, function(st
     end
 end)
 
-menu:AddButton("Зафиксировать точку [E]", recordCoordinates)
-
+-- Other
+menu:AddLabel("Управление Всяким", {
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    TextColor = Color3.fromRGB(0, 255, 150)
+})
 menu:AddButton("Востановить здоровье", function()
     local character = player.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -326,26 +385,6 @@ menu:AddButton("Бессмертие (God Mode)", function()
     if humanoid then
         humanoid.MaxHealth = math.huge
         humanoid.Health = math.huge
-    end
-end)
-
-menu:AddTextBox("Скорость полета (дефолт: 50)...", function(text)
-    local n = tonumber(text)
-    if n then speed = n print("[Система] Скорость полета:", speed)
-    else print("[Ошибка] Введите число!") end
-end)
-
-menu:AddTextBox("WalkSpeed (дефолт: 16)...", function(text)
-    local n = tonumber(text)
-    if n then walksspeedVar = n print("[Система] WalkSpeed:", walksspeedVar)
-    else print("[Ошибка] Введите число!") end
-end)
-
-
-walkspeedToggleUi = menu:AddToggle("Цикл WalkSpeed", isWalkSpeed, function(state)
-    isWalkSpeed = state
-    if state == false then
-        hum.WalkSpeed = 16        
     end
 end)
 
@@ -445,8 +484,19 @@ end
 --     end
 -- end)
 
+menu:AddLabel("Утилитки", {
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    TextColor = Color3.fromRGB(0, 255, 150)
+})
+
 menu:AddButton("Dexplorer", function()
     FlexUI.Dexplorer()
+end)
+menu:AddButton("Телепорт к сундуку", function()
+    teleport(player, Vector3.new(145.55, -2.49, 1049.40))
+    task.wait(1)
+    teleport(player, Vector3.new(-50.83, -357.62, 9501.02))
 end)
 menu:AddDestroyButton("Закрыть и очистить память", Color3.fromRGB(200, 50, 50), function() 
     if _G.DebugInputConnection then
