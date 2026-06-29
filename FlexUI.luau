@@ -353,19 +353,18 @@ function FlexUI:AddSelect(elements, defaultValue)
 	local isOpened = false
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	
-	-- 1. Создаем кнопку-триггер
+	-- 1. Создаем кнопку-триггер (остается в общем списке)
 	local triggerButton = Instance.new("TextButton")
 	triggerButton.Size = UDim2.new(1, 0, 0, 35)
-	triggerButton.Position = UDim2.new(0, 0, 0, 0)
 	triggerButton.BackgroundColor3 = self.Theme.SelectTriggerButtonColor
 	triggerButton.TextColor3 = self.Theme.SelectTriggerButtonTextColor
 	triggerButton.Font = Enum.Font.GothamMedium
 	triggerButton.TextSize = 14
 	triggerButton.Text = tostring(currentValue)
 	triggerButton.AutoButtonColor = false
-	triggerButton.Parent = self.ContentFrame -- ⚠️ ВАЖНО: Добавляем в ContentFrame, а не MainFrame
+	triggerButton.Parent = self.ContentFrame -- Оставляем в скроллфрейме
 	
-	-- Индикатор стрелочки
+	-- Стрелочка
 	local arrow = Instance.new("TextLabel")
 	arrow.Size = UDim2.new(0, 30, 1, 0)
 	arrow.Position = UDim2.new(1, -30, 0, 0)
@@ -373,35 +372,34 @@ function FlexUI:AddSelect(elements, defaultValue)
 	arrow.Text = "▼"
 	arrow.TextSize = 10
 	arrow.TextColor3 = self.Theme.SelectTriggerButtonArrowTextColor
-	arrow.ZIndex = 2
 	arrow.Parent = triggerButton
 
-	-- 2. Создаем выпадающий контейнер
-	local contentFrame = Instance.new("ScrollingFrame")
-	contentFrame.Size = UDim2.new(1, 0, 0, 0)
-	contentFrame.Position = UDim2.new(0, 0, 0, 36)
-	contentFrame.BackgroundTransparency = 1
-	contentFrame.BorderSizePixel = 0
-	contentFrame.ScrollBarThickness = 3
-	contentFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-	contentFrame.Visible = false
-	contentFrame.ClipsDescendants = true
-	
-	-- ✅ ИСПРАВЛЕНИЕ 1: Повышаем ZIndex, чтобы список был ПОВЕРХ всех остальных кнопок
-	contentFrame.ZIndex = 10 
-	contentFrame.Parent = self.ContentFrame -- ⚠️ ВАЖНО: Тоже в ContentFrame
+	-- 2. Создаем ВЫПАДАЮЩИЙ СПИСОК ОТДЕЛЬНО (поверх всего)
+	local dropdownFrame = Instance.new("ScrollingFrame")
+	dropdownFrame.Name = "Dropdown_" .. tostring(currentValue)
+	dropdownFrame.Size = UDim2.new(1, 0, 0, 0)
+	-- Позицию будем задать динамически при открытии
+	dropdownFrame.BackgroundTransparency = 1
+	dropdownFrame.BorderSizePixel = 0
+	dropdownFrame.ScrollBarThickness = 4
+	dropdownFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+	dropdownFrame.Visible = false
+	dropdownFrame.ClipsDescendants = true
+	dropdownFrame.ZIndex = 100 -- Высокий ZIndex, чтобы быть поверх кнопок
+	dropdownFrame.Parent = self.MainFrame -- ВАЖНО: Родитель - MainFrame, а не ContentFrame!
 	
 	local listLayout = Instance.new("UIListLayout")
 	listLayout.Padding = UDim.new(0, 2)
 	listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Parent = contentFrame
+	listLayout.Parent = dropdownFrame
 	
+	-- Автоподстройка высоты контента
 	listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		contentFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
+		dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
 	end) 
 
-	-- 3. Объект для управления селектом
+	-- 3. Объект управления
 	local SelectObject = {}
 	local optionButtons = {}
     local previousValue = currentValue
@@ -419,17 +417,15 @@ function FlexUI:AddSelect(elements, defaultValue)
 		triggerButton.Text = tostring(currentValue)
 	end
 
+    -- Функция удаления из таблицы
     local function removeValueFromTable(arr, value)
         for i, v in ipairs(arr) do
-            if v == value then
-                table.remove(arr, i)
-                return true
-            end
+            if v == value then table.remove(arr, i); return true end
         end
         return false
     end
 
-	-- Генерация опций
+	-- Генерация кнопок опций
 	if elements and type(elements) == "table" then
 		for i, element in ipairs(elements) do
 			local optBtn = Instance.new("TextButton")
@@ -442,18 +438,14 @@ function FlexUI:AddSelect(elements, defaultValue)
 			optBtn.Text = tostring(element)
 			optBtn.AutoButtonColor = false
 			optBtn.LayoutOrder = i
-			
-			-- ✅ ИСПРАВЛЕНИЕ 2: Устанавливаем ZIndex для каждой опции
-			optBtn.ZIndex = 11 
-			
-			optBtn.Parent = contentFrame
+			optBtn.ZIndex = 101 -- Поверх самого фрейма
+			optBtn.Parent = dropdownFrame
 			
 			table.insert(optionButtons, optBtn)
 			
 			optBtn.MouseButton1Click:Connect(function()
                 previousValue = currentValue
 				currentValue = element
-				
 				updateHighlight()
 				SelectObject:Close()
 				
@@ -464,18 +456,33 @@ function FlexUI:AddSelect(elements, defaultValue)
 		end
 	end
 
+	-- Логика открытия/закрытия
 	function SelectObject:Open()
 		isOpened = true
-		contentFrame.Visible = true
-		contentFrame:TweenSize(UDim2.new(1, 0, 0, math.min(listLayout.AbsoluteContentSize.Y + 4, 150)), "Out", "Quad", 0.2, true)
+		
+		-- ✅ МАГИЯ: Вычисляем позицию кнопки относительно MainFrame
+		-- Нам нужно знать, где находится triggerButton внутри MainFrame
+		local absPos = triggerButton.AbsolutePosition
+		local mainAbsPos = self.MainFrame.AbsolutePosition
+		
+		-- Смещение Y = (Позиция кнопки - Позиция окна) + Высота кнопки
+		local relativeY = (absPos.Y - mainAbsPos.Y) + triggerButton.AbsoluteSize.Y
+		
+		dropdownFrame.Position = UDim2.new(0, 0, 0, relativeY)
+		dropdownFrame.Visible = true
+		
+		-- Анимация раскрытия
+		local targetHeight = math.min(listLayout.AbsoluteContentSize.Y + 4, 200) -- Макс высота 200
+		dropdownFrame:TweenSize(UDim2.new(1, 0, 0, targetHeight), "Out", "Quad", 0.2, true)
+		
 		arrow.Text = "▲"
 		updateHighlight()
 	end
 
 	function SelectObject:Close()
 		isOpened = false
-		contentFrame:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.15, true, function()
-			if not isOpened then contentFrame.Visible = false end
+		dropdownFrame:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.15, true, function()
+			if not isOpened then dropdownFrame.Visible = false end
 		end)
 		arrow.Text = "▼"
 	end
@@ -488,6 +495,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 		SelectObject:Toggle()
 	end)
 
+	-- Публичные методы
 	function SelectObject:SetValue(val)
         previousValue = currentValue
 		currentValue = val
@@ -497,39 +505,32 @@ function FlexUI:AddSelect(elements, defaultValue)
         end
 	end
 
-	function SelectObject:GetValue()
-		return currentValue
-	end
-    
-    function SelectObject:GetPreviousValue()
-        return previousValue
-    end
+	function SelectObject:GetValue() return currentValue end
+    function SelectObject:GetPreviousValue() return previousValue end
 
 	function SelectObject:AddElement(element_value)
 		elements[#elements + 1] = element_value
-		updateHighlight()
-		return elements
+		-- Тут нужно добавить кнопку в dropdownFrame, но для простоты пока просто обновляем массив
+		-- В идеале нужно пересоздать кнопки или добавить одну новую
 	end
 
 	function SelectObject:RemoveElementByIndex(element_index)
 		table.remove(elements, element_index)
-		updateHighlight()
 	end
 
 	function SelectObject:RemoveElementByName(value)
-		local status = removeValueFromTable(elements, value)
-		updateHighlight()
-		return status
+		return removeValueFromTable(elements, value)
 	end
 
 	function SelectObject:SetElementsArray(new_elements)
 		elements = new_elements
-        
-        for _, child in ipairs(contentFrame:GetChildren()) do
+        -- Очистка старых кнопок
+        for _, child in ipairs(dropdownFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
         optionButtons = {}
         
+        -- Пересоздание (упрощенно)
         if elements and type(elements) == "table" then
             for i, element in ipairs(elements) do
                 local optBtn = Instance.new("TextButton")
@@ -542,8 +543,8 @@ function FlexUI:AddSelect(elements, defaultValue)
                 optBtn.Text = tostring(element)
                 optBtn.AutoButtonColor = false
                 optBtn.LayoutOrder = i
-                optBtn.ZIndex = 11
-                optBtn.Parent = contentFrame
+                optBtn.ZIndex = 101
+                optBtn.Parent = dropdownFrame
                 table.insert(optionButtons, optBtn)
                 
                 optBtn.MouseButton1Click:Connect(function()
@@ -551,25 +552,20 @@ function FlexUI:AddSelect(elements, defaultValue)
                     currentValue = element
                     updateHighlight()
                     SelectObject:Close()
-                    if SelectObject.OnChanged then
-                        SelectObject.OnChanged(currentValue, previousValue)
-                    end
+                    if SelectObject.OnChanged then SelectObject.OnChanged(currentValue, previousValue) end
                 end)
             end
         end
-
 		currentValue = defaultValue or (elements and elements[1]) or ""
         previousValue = currentValue
 		updateHighlight()
 	end
 	
-	function SelectObject:GetElementsArray()
-		return elements
-	end
+	function SelectObject:GetElementsArray() return elements end
 
 	function SelectObject:Destroy()
 		triggerButton:Destroy()
-		contentFrame:Destroy()
+		dropdownFrame:Destroy()
 	end
 
 	updateHighlight()

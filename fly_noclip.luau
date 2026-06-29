@@ -360,7 +360,7 @@ if #teams:GetChildren() > 0 then
         TextColor = Color3.fromRGB(255, 200, 0)
     })
     
-    local select_team_to_change = menu:AddSelect({})
+    local select_team_to_change = menu:AddSelect({}, "Выберите команду...")
 
     for _, team in ipairs(teams:GetChildren()) do
         select_team_to_change:AddElement(team.Name)
@@ -371,7 +371,7 @@ if #teams:GetChildren() > 0 then
     end
 
     select_team_to_change.OnChanged = function(newValue, oldValue)
-        if newValue ~= oldValue then
+        if newValue ~= oldValue and newValue ~= "Выберите команду..." then
             local teamObj = game:GetService("Teams"):FindFirstChild(newValue)
             if teamObj then
                 player.Team = teamObj
@@ -404,7 +404,7 @@ teamSelect.OnChanged = function(newValue, oldValue)
         local _spawn = teams_spawn_points[newValue]
         if _spawn then
             teleport(player, _spawn)
-            print(string.format("[Team TP] Перемещение в: %s", newValue))
+            -- print(string.format("[Team TP] Перемещение в: %s", newValue))
         else
             warn("[Team TP] Точка спавна для команды не найдена!")
         end
