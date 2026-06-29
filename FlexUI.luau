@@ -353,7 +353,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	local isOpened = false
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	
-	-- 1. Кнопка-триггер (остается в общем списке)
+	-- 1. Кнопка-триггер (остается в общем списке кнопок)
 	local triggerButton = Instance.new("TextButton")
 	triggerButton.Size = UDim2.new(1, 0, 0, 35)
 	triggerButton.BackgroundColor3 = self.Theme.SelectTriggerButtonColor
@@ -374,7 +374,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	arrow.TextColor3 = self.Theme.SelectTriggerButtonArrowTextColor
 	arrow.Parent = triggerButton
 
-	-- 2. Выпадающий список (лежит ОТДЕЛЬНО поверх всего)
+	-- 2. Выпадающий список (лежит ОТДЕЛЬНО поверх всего окна)
 	local dropdownFrame = Instance.new("ScrollingFrame")
 	dropdownFrame.Name = "Dropdown_" .. tostring(currentValue)
 	dropdownFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -384,8 +384,8 @@ function FlexUI:AddSelect(elements, defaultValue)
 	dropdownFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
 	dropdownFrame.Visible = false
 	dropdownFrame.ClipsDescendants = true
-	dropdownFrame.ZIndex = 100 
-	dropdownFrame.Parent = self.MainFrame -- Родитель: MainFrame
+	dropdownFrame.ZIndex = 100 -- Поверх всех кнопок
+	dropdownFrame.Parent = self.MainFrame -- ВАЖНО: Родитель - MainFrame
 	
 	local listLayout = Instance.new("UIListLayout")
 	listLayout.Padding = UDim.new(0, 2)
@@ -454,27 +454,30 @@ function FlexUI:AddSelect(elements, defaultValue)
 	function SelectObject:Open()
 		isOpened = true
 		
-		-- ✅ ИСПРАВЛЕНИЕ: Вычисляем позицию математически через LayoutOrder
-		-- Это работает всегда, даже если AbsolutePosition = nil
+		-- ✅ БЕЗОПАСНЫЙ РАСЧЕТ ПОЗИЦИИ (БЕЗ AbsolutePosition)
+		-- Мы считаем высоту всех элементов, которые стоят В ВЫШЕ нашей кнопки в списке
 		
 		local mainList = self.ContentFrame:FindFirstChildOfClass("UIListLayout")
-		local padding = mainList and mainList.Padding.Offset or 6 -- Отступ между элементами (у вас было 6 в AddButton)
-		local itemHeight = 35 -- Высота кнопки селекта
+		local padding = mainList and mainList.Padding.Offset or 6 -- Стандартный отступ UIListLayout
 		
-		-- Считаем, сколько пикселей занимает место ДО нашей кнопки
 		local offsetY = 0
+		-- Проходим по всем детям ContentFrame пока не найдем нашу кнопку
 		for _, child in ipairs(self.ContentFrame:GetChildren()) do
-			if child == triggerButton then break end -- Дошли до нашей кнопки - стоп
+			if child == triggerButton then break end 
+			-- Считаем только видимые GUI объекты (пропускаем UIListLayout и т.д.)
 			if child:IsA("GuiObject") and child.Visible then
-				offsetY = offsetY + child.AbsoluteSize.Y + padding
+				-- Используем AbsoluteSize.Y, но если он nil (не отрисован), берем Size.Y.Offset
+				local h = child.AbsoluteSize.Y 
+				if not h then h = child.Size.Y.Offset end
+				offsetY = offsetY + h + padding
 			end
 		end
 		
 		-- Учитываем текущий скролл, чтобы список "ехал" за кнопкой
 		local scrollOffset = self.ContentFrame.CanvasPosition.Y
 		
-		-- Финальная позиция: отступ сверху + смещение скролла + высота самой кнопки
-		dropdownFrame.Position = UDim2.new(0, 0, 0, offsetY - scrollOffset + itemHeight)
+		-- Финальная позиция Y = (накопленная высота) - (скролл) + (высота самой кнопки)
+		dropdownFrame.Position = UDim2.new(0, 0, 0, offsetY - scrollOffset + 35)
 		
 		dropdownFrame.Visible = true
 		local targetHeight = math.min(listLayout.AbsoluteContentSize.Y + 4, 200)
