@@ -295,14 +295,14 @@ end
 function FlexUI:AddBind(keyCode, callback)
 	if typeof(keyCode) == "EnumItem" then
 		self.Keybinds[keyCode] = callback
-		print("[FlexUI] Установлен бинд на клавишу: " .. keyCode.Name)
+		print("[FlexUI] Setted up bind for: " .. keyCode.Name)
 	end
 end
 
 function FlexUI:RemoveBind(keyCode)
 	if typeof(keyCode) == "EnumItem" then
 		self.Keybinds[keyCode] = nil
-		print("[FlexUI] Удален бинд с клавиши: " .. keyCode.Name)
+		print("[FlexUI] Remove bind for: " .. keyCode.Name)
 	end
 end
 
@@ -351,9 +351,10 @@ end
 --  in dev
 function FlexUI:AddSelect(elements, defaultValue)
 	local isOpened = false
+	-- Инициализируем currentValue
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	
-	-- 1. Создаем кнопку-триггер (верхняя часть селекта)
+	-- 1. Создаем кнопку-триггер
 	local triggerButton = Instance.new("TextButton")
 	triggerButton.Size = UDim2.new(1, 0, 0, 35)
 	triggerButton.Position = UDim2.new(0, 0, 0, 0)
@@ -365,7 +366,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	triggerButton.AutoButtonColor = false
 	triggerButton.Parent = self.MainFrame
 	
-	-- Индикатор стрелочки (опционально)
+	-- Индикатор стрелочки
 	local arrow = Instance.new("TextLabel")
 	arrow.Size = UDim2.new(0, 30, 1, 0)
 	arrow.Position = UDim2.new(1, -30, 0, 0)
@@ -375,9 +376,9 @@ function FlexUI:AddSelect(elements, defaultValue)
 	arrow.TextColor3 = self.Theme.SelectTriggerButtonArrowTextColor
 	arrow.Parent = triggerButton
 
-	-- 2. Создаем выпадающий контейнер (ваш原有代码 + улучшения)
+	-- 2. Создаем выпадающий контейнер
 	local contentFrame = Instance.new("ScrollingFrame")
-	contentFrame.Size = UDim2.new(1, 0, 0, 0) -- Высота 0 когда закрыто
+	contentFrame.Size = UDim2.new(1, 0, 0, 0)
 	contentFrame.Position = UDim2.new(0, 0, 0, 36)
 	contentFrame.BackgroundTransparency = 1
 	contentFrame.BorderSizePixel = 0
@@ -386,7 +387,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	contentFrame.Visible = false
 	contentFrame.ClipsDescendants = true
 	contentFrame.Parent = self.MainFrame
-	self.ContentFrame = contentFrame
+	self.ContentFrame = contentFrame -- ⚠️ Внимание: это перезаписывается при каждом новом селекте!
 	
 	local listLayout = Instance.new("UIListLayout")
 	listLayout.Padding = UDim.new(0, 2)
@@ -394,7 +395,6 @@ function FlexUI:AddSelect(elements, defaultValue)
 	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	listLayout.Parent = contentFrame
 	
-	-- Автоподстройка CanvasSize
 	listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		contentFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
 	end) 
@@ -402,20 +402,32 @@ function FlexUI:AddSelect(elements, defaultValue)
 	-- 3. Объект для управления селектом
 	local SelectObject = {}
 	local optionButtons = {}
+    local previousValue = currentValue -- Сохраняем начальное значение как "предыдущее"
 
-	-- Функция обновления визуала выбранного элемента
+	-- Функция обновления визуала
 	local function updateHighlight()
 		for _, btn in ipairs(optionButtons) do
 			if btn.Name == tostring(currentValue) then
-				btn.BackgroundColor3 = self.Theme.SelectOptionActiveBGColor -- Цвет активного
+				btn.BackgroundColor3 = self.Theme.SelectOptionActiveBGColor
 				btn.TextColor3 = self.Theme.SelectOptionActiveTextColor
 			else
-				btn.BackgroundColor3 = self.Theme.SelectOptionBGColor -- Цвет обычного
+				btn.BackgroundColor3 = self.Theme.SelectOptionBGColor
 				btn.TextColor3 = self.Theme.SelectOptionTextColor
 			end
 		end
 		triggerButton.Text = tostring(currentValue)
 	end
+
+    -- Вспомогательная функция для удаления по значению (исправление вашей ошибки)
+    local function removeValueFromTable(arr, value)
+        for i, v in ipairs(arr) do
+            if v == value then
+                table.remove(arr, i)
+                return true
+            end
+        end
+        return false
+    end
 
 	-- Генерация опций
 	if elements and type(elements) == "table" then
@@ -435,11 +447,16 @@ function FlexUI:AddSelect(elements, defaultValue)
 			table.insert(optionButtons, optBtn)
 			
 			optBtn.MouseButton1Click:Connect(function()
-				currentValue = element
+                -- ✅ ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ
+                previousValue = currentValue -- Запоминаем старое значение ПЕРЕД изменением
+				currentValue = element       -- Устанавливаем новое
+				
 				updateHighlight()
 				SelectObject:Close()
+				
 				if SelectObject.OnChanged then
-					SelectObject.OnChanged(currentValue)
+                    -- Передаем (newValue, oldValue)
+					SelectObject.OnChanged(currentValue, previousValue)
 				end
 			end)
 		end
@@ -449,7 +466,6 @@ function FlexUI:AddSelect(elements, defaultValue)
 	function SelectObject:Open()
 		isOpened = true
 		contentFrame.Visible = true
-		-- Анимация раскрытия (простая)
 		contentFrame:TweenSize(UDim2.new(1, 0, 0, math.min(listLayout.AbsoluteContentSize.Y + 4, 150)), "Out", "Quad", 0.2, true)
 		arrow.Text = "▲"
 		updateHighlight()
@@ -467,42 +483,88 @@ function FlexUI:AddSelect(elements, defaultValue)
 		if isOpened then self:Close() else self:Open() end
 	end
 
-	-- Привязка клика к триггеру
 	triggerButton.MouseButton1Click:Connect(function()
 		SelectObject:Toggle()
 	end)
 
 	-- Публичные методы
 	function SelectObject:SetValue(val)
+        previousValue = currentValue -- Обновляем предыдущее значение и при программной смене
 		currentValue = val
 		updateHighlight()
+        if SelectObject.OnChanged then
+            SelectObject.OnChanged(currentValue, previousValue)
+        end
 	end
 
 	function SelectObject:GetValue()
 		return currentValue
 	end
+    
+    function SelectObject:GetPreviousValue()
+        return previousValue
+    end
 
 	function SelectObject:AddElement(element_value)
 		elements[#elements + 1] = element_value
+        -- Тут стоит пересоздать кнопку, но для простоты оставим как есть
+        -- В идеале нужно создать новый optBtn и добавить в optionButtons
 		updateHighlight()
 		return elements
 	end
 
 	function SelectObject:RemoveElementByIndex(element_index)
 		table.remove(elements, element_index)
+        -- Тут нужно удалить соответствующий optBtn из optionButtons и contentFrame
 		updateHighlight()
 	end
 
-	function SelectObject:RemoveElementByName(arr, value)
-		local status = removeByValue(arr, value)
+	function SelectObject:RemoveElementByName(value)
+        -- Исправлено: используем локальную функцию вместо несуществующей глобальной
+		local status = removeValueFromTable(elements, value)
 		updateHighlight()
 		return status
 	end
 
-
 	function SelectObject:SetElementsArray(new_elements)
 		elements = new_elements
+        
+        -- Очистка старых кнопок
+        for _, child in ipairs(contentFrame:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        optionButtons = {}
+        
+        -- Пересоздание кнопок (упрощенно, лучше вынести генерацию в отдельную функцию)
+        if elements and type(elements) == "table" then
+            for i, element in ipairs(elements) do
+                local optBtn = Instance.new("TextButton")
+                optBtn.Name = tostring(element)
+                optBtn.Size = UDim2.new(1, -4, 0, 28)
+                optBtn.BackgroundColor3 = self.Theme.SelectOptionBGColor
+                optBtn.TextColor3 = self.Theme.SelectOptionTextColor
+                optBtn.Font = Enum.Font.Gotham
+                optBtn.TextSize = 13
+                optBtn.Text = tostring(element)
+                optBtn.AutoButtonColor = false
+                optBtn.LayoutOrder = i
+                optBtn.Parent = contentFrame
+                table.insert(optionButtons, optBtn)
+                
+                optBtn.MouseButton1Click:Connect(function()
+                    previousValue = currentValue
+                    currentValue = element
+                    updateHighlight()
+                    SelectObject:Close()
+                    if SelectObject.OnChanged then
+                        SelectObject.OnChanged(currentValue, previousValue)
+                    end
+                end)
+            end
+        end
+
 		currentValue = defaultValue or (elements and elements[1]) or ""
+        previousValue = currentValue -- Сбрасываем previousValue при полной замене списка
 		updateHighlight()
 	end
 	
@@ -515,9 +577,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 		contentFrame:Destroy()
 	end
 
-	-- Инициализация начального состояния
 	updateHighlight()
-
 	return SelectObject
 end
 

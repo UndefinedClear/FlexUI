@@ -360,15 +360,27 @@ if #teams:GetChildren() > 0 then
         TextColor = Color3.fromRGB(255, 200, 0)
     })
     
-    local select_team_to_change = menu:AddSelect()
+    local select_team_to_change = menu:AddSelect({})
 
     for _, team in ipairs(teams:GetChildren()) do
-        select_team_to_change:AddElement()
-        menu:AddButton("В команду: " .. team.Name, function()
-            player.Team = team
-            print("[Team Switcher] Перешёл в:", team.Name)
-        end)
+        select_team_to_change:AddElement(team.Name)
+        -- menu:AddButton("В команду: " .. team.Name, function()
+        --     player.Team = team
+        --     print("[Team Switcher] Перешёл в:", team.Name)
+        -- end)
     end
+
+    select_team_to_change.OnChanged = function(newValue, oldValue)
+        if newValue ~= oldValue then
+            local teamObj = game:GetService("Teams"):FindFirstChild(newValue)
+            if teamObj then
+                player.Team = teamObj
+            else
+                warn("Команда не найдена: " .. tostring(newValue))
+            end
+        end
+    end
+    -- print(string.format("Value changed from/to: '%s' -> '%s'", tostring(oldValue), tostring(newValue)))
 end
 
 menu:AddLabel("Телепорт по командам", {
@@ -377,13 +389,35 @@ menu:AddLabel("Телепорт по командам", {
     TextColor = Color3.fromRGB(0, 255, 150)
 })
 
--- ИСПРАВЛЕНО (цикл for):
-for k, v in pairs(teams_spawn_points) do  -- добавлено pairs()
-    menu:AddButton("Команда: " .. k, function()
-        teleport(player, v)
-        print("[Team TP] Перешёл в:", k)
-    end)
+local teamNames = {}
+for name, _ in pairs(teams_spawn_points) do
+    table.insert(teamNames, tostring(name))
 end
+
+-- Сортируем список, чтобы команды были по алфавиту
+table.sort(teamNames)
+
+local teamSelect = menu:AddSelect(teamNames, "Выберите команду...")
+
+teamSelect.OnChanged = function(newValue, oldValue)
+    if newValue ~= oldValue and newValue ~= "Выберите команду..." then
+        local _spawn = teams_spawn_points[newValue]
+        if _spawn then
+            teleport(player, _spawn)
+            print(string.format("[Team TP] Перемещение в: %s", newValue))
+        else
+            warn("[Team TP] Точка спавна для команды не найдена!")
+        end
+    end
+end
+
+-- -- ИСПРАВЛЕНО (цикл for):
+-- for k, v in pairs(teams_spawn_points) do  -- добавлено pairs()
+--     menu:AddButton("Команда: " .. k, function()
+--         teleport(player, v)
+--         print("[Team TP] Перешёл в:", k)
+--     end)
+-- end
 
 -- menu:AddButton("Бессмертие (God Mode)", function()
 --     local character = player.Character
