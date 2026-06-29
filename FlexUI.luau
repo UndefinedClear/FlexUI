@@ -353,7 +353,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	local isOpened = false
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	
-	-- 1. Кнопка-триггер (остается в общем списке кнопок)
+	-- 1. Кнопка-триггер
 	local triggerButton = Instance.new("TextButton")
 	triggerButton.Size = UDim2.new(1, 0, 0, 35)
 	triggerButton.BackgroundColor3 = self.Theme.SelectTriggerButtonColor
@@ -362,7 +362,15 @@ function FlexUI:AddSelect(elements, defaultValue)
 	triggerButton.TextSize = 14
 	triggerButton.Text = tostring(currentValue)
 	triggerButton.AutoButtonColor = false
-	triggerButton.Parent = self.ContentFrame
+	
+	-- ✅ ИСПРАВЛЕНИЕ: Безопасное получение ContentFrame
+	-- Если self.ContentFrame потерян, ищем первый ScrollingFrame внутри MainFrame
+	local safeContentFrame = self.ContentFrame 
+	if not safeContentFrame or not safeContentFrame.Parent then
+		safeContentFrame = self.MainFrame:FindFirstChildOfClass("ScrollingFrame")
+	end
+	
+	triggerButton.Parent = safeContentFrame
 	
 	-- Стрелочка
 	local arrow = Instance.new("TextLabel")
@@ -374,7 +382,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	arrow.TextColor3 = self.Theme.SelectTriggerButtonArrowTextColor
 	arrow.Parent = triggerButton
 
-	-- 2. Выпадающий список (лежит ОТДЕЛЬНО поверх всего окна)
+	-- 2. Выпадающий список (поверх всего)
 	local dropdownFrame = Instance.new("ScrollingFrame")
 	dropdownFrame.Name = "Dropdown_" .. tostring(currentValue)
 	dropdownFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -384,8 +392,8 @@ function FlexUI:AddSelect(elements, defaultValue)
 	dropdownFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
 	dropdownFrame.Visible = false
 	dropdownFrame.ClipsDescendants = true
-	dropdownFrame.ZIndex = 100 -- Поверх всех кнопок
-	dropdownFrame.Parent = self.MainFrame -- ВАЖНО: Родитель - MainFrame
+	dropdownFrame.ZIndex = 100 
+	dropdownFrame.Parent = self.MainFrame 
 	
 	local listLayout = Instance.new("UIListLayout")
 	listLayout.Padding = UDim.new(0, 2)
@@ -454,29 +462,32 @@ function FlexUI:AddSelect(elements, defaultValue)
 	function SelectObject:Open()
 		isOpened = true
 		
-		-- ✅ БЕЗОПАСНЫЙ РАСЧЕТ ПОЗИЦИИ (БЕЗ AbsolutePosition)
-		-- Мы считаем высоту всех элементов, которые стоят В ВЫШЕ нашей кнопки в списке
-		
-		local mainList = self.ContentFrame:FindFirstChildOfClass("UIListLayout")
-		local padding = mainList and mainList.Padding.Offset or 6 -- Стандартный отступ UIListLayout
+		-- ✅ БЕЗОПАСНЫЙ РАСЧЕТ ПОЗИЦИИ
+		-- Снова используем безопасный поиск контейнера
+		local currentContentFrame = self.ContentFrame 
+		if not currentContentFrame or not currentContentFrame.Parent then
+			currentContentFrame = self.MainFrame:FindFirstChildOfClass("ScrollingFrame")
+		end
+
+		if not currentContentFrame then 
+			warn("[FlexUI] Error: Main ContentFrame not found!") 
+			return 
+		end
+
+		local mainList = currentContentFrame:FindFirstChildOfClass("UIListLayout")
+		local padding = mainList and mainList.Padding.Offset or 6 
 		
 		local offsetY = 0
-		-- Проходим по всем детям ContentFrame пока не найдем нашу кнопку
-		for _, child in ipairs(self.ContentFrame:GetChildren()) do
+		for _, child in ipairs(currentContentFrame:GetChildren()) do
 			if child == triggerButton then break end 
-			-- Считаем только видимые GUI объекты (пропускаем UIListLayout и т.д.)
 			if child:IsA("GuiObject") and child.Visible then
-				-- Используем AbsoluteSize.Y, но если он nil (не отрисован), берем Size.Y.Offset
 				local h = child.AbsoluteSize.Y 
 				if not h then h = child.Size.Y.Offset end
 				offsetY = offsetY + h + padding
 			end
 		end
 		
-		-- Учитываем текущий скролл, чтобы список "ехал" за кнопкой
-		local scrollOffset = self.ContentFrame.CanvasPosition.Y
-		
-		-- Финальная позиция Y = (накопленная высота) - (скролл) + (высота самой кнопки)
+		local scrollOffset = currentContentFrame.CanvasPosition.Y
 		dropdownFrame.Position = UDim2.new(0, 0, 0, offsetY - scrollOffset + 35)
 		
 		dropdownFrame.Visible = true
