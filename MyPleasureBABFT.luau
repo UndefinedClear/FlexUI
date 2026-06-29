@@ -87,6 +87,69 @@ local function applyNoclip(state)
     end
 end
 
+local function killPlayer(targetPlayer)
+    local char = targetPlayer.Character
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    -- Вариант А: Удар об пол (самый безопасный от детекта)
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity = Vector3.new(0, -500, 0) -- Летит вниз со скоростью 500
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Parent = root
+    
+    -- Удаляем BodyVelocity через секунду, чтобы не спамить
+    task.delay(1, function() if bv and bv.Parent then bv:Destroy() end end)
+end
+
+-- Пример использования:
+-- killPlayer(game:GetService("Players"):GetChildren()[2]) -- Убивает второго игрока в списке
+
+local function sendToVoid(targetPlayer)
+    local char = targetPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if root then
+        -- Телепорт глубоко под карту
+        root.CFrame = CFrame.new(root.Position.X, -9999, root.Position.Z)
+    end
+end
+
+-- Переменная для хранения найденного объекта игрока
+local foundTargetPlayer = nil
+
+-- 2. Функция поиска по Username с проверкой
+local function findAndSelectPlayer(username)
+    -- Сбрасываем предыдущую цель
+    foundTargetPlayer = nil
+    
+    task.spawn(function()
+        local success, userId = pcall(function()
+            return Players:GetUserIdFromNameAsync(username)
+        end)
+        
+        if not success then
+            warn(`[Поиск] Ошибка при поиске "{username}": {userId}`)
+            return
+        end
+        
+        -- Проверяем, есть ли этот игрок сейчас на сервере
+        local player = Players:GetPlayerByUserId(userId)
+        
+        if player then
+            foundTargetPlayer = player
+            print(`[Поиск] ✅ Игрок найден: {player.Name} (ID: {userId})`)
+            
+            -- Опционально: можно визуально подсветить или выбрать в селекте
+            -- targetSelect:SetValue(player.DisplayName) 
+        else
+            warn(`[Поиск] ❌ Игрок "{username}" существует, но НЕ на этом сервере!`)
+        end
+    end)
+end
+
 -- =======================================================
 -- ОСНОВНОЙ ЦИКЛ (ВСЁ В ОДНОМ МЕСТЕ — ПОЛЁТ + ЭФФЕКТЫ)
 -- =======================================================
@@ -247,7 +310,7 @@ local neonTheme = {
     ButtonHover = Color3.fromRGB(0, 255, 150),
     ButtonText = Color3.fromRGB(255, 255, 255),
     TriggerBackground = Color3.fromRGB(0, 255, 150),
-    titleTextSize = 10
+    TitleTextSize = 10
 }
 
 local config = {
@@ -371,6 +434,46 @@ menu:AddLabel("Управление Всяким", {
     TextSize = 11,
     TextColor = Color3.fromRGB(0, 255, 150)
 })
+
+
+-- 1. TextBox для ввода Username
+local usernameInput = menu:AddTextBox("Введите Username...", function(text, enterPressed)
+    if enterPressed and #text > 0 then
+        findAndSelectPlayer(text)
+    end
+end)
+
+-- 3. Кнопки действий
+menu:AddButton("🎯 Применить к цели (killPlayer)", function()
+    if foundTargetPlayer and foundTargetPlayer.Character then
+        print(`[Действие] Применяю к {foundTargetPlayer.Name}`)
+        -- ТВОЯ ЛОГИКА ЗДЕСЬ, например:
+        killPlayer(foundTargetPlayer)
+    else
+        warn("[Действие] Цель не найдена или отсутствует персонаж!")
+    end
+end)
+
+menu:AddButton("🎯 Применить к цели (sendToVoid)", function()
+    if foundTargetPlayer and foundTargetPlayer.Character then
+        print(`[Действие] Применяю к {foundTargetPlayer.Name}`)
+        -- ТВОЯ ЛОГИКА ЗДЕСЬ, например:
+        sendToVoid(foundTargetPlayer)
+    else
+        warn("[Действие] Цель не найдена или отсутствует персонаж!")
+    end
+end)
+
+menu:AddButton("🔍 Найти заново", function()
+    local text = usernameInput:GetValue()
+    if #text > 0 then
+        findAndSelectPlayer(text)
+    else
+        warn("[Поиск] Введите Username в поле выше!")
+    end
+end)
+
+
 menu:AddButton("Востановить здоровье", function()
     local character = player.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")

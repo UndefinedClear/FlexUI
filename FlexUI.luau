@@ -579,6 +579,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	
 	function SelectObject:GetElementsArray() return elements end
 
+
 	function SelectObject:Destroy()
 		triggerButton:Destroy()
 		dropdownFrame:Destroy()
@@ -746,6 +747,9 @@ function FlexUI:AddTextBox(placeholderText, callback)
 	function TextBoxObject:SetValue(text) box.Text = tostring(text) end
 	function TextBoxObject:GetValue() return box.Text end
 
+	function TextBoxObject:GetInstance()
+		return box
+	end
 	function TextBoxObject:Destroy() container:Destroy() end
 	return TextBoxObject
 end
