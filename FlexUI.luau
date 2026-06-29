@@ -351,7 +351,6 @@ end
 --  in dev
 function FlexUI:AddSelect(elements, defaultValue)
 	local isOpened = false
-	-- Инициализируем currentValue
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	
 	-- 1. Создаем кнопку-триггер
@@ -364,7 +363,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	triggerButton.TextSize = 14
 	triggerButton.Text = tostring(currentValue)
 	triggerButton.AutoButtonColor = false
-	triggerButton.Parent = self.MainFrame
+	triggerButton.Parent = self.ContentFrame -- ⚠️ ВАЖНО: Добавляем в ContentFrame, а не MainFrame
 	
 	-- Индикатор стрелочки
 	local arrow = Instance.new("TextLabel")
@@ -374,6 +373,7 @@ function FlexUI:AddSelect(elements, defaultValue)
 	arrow.Text = "▼"
 	arrow.TextSize = 10
 	arrow.TextColor3 = self.Theme.SelectTriggerButtonArrowTextColor
+	arrow.ZIndex = 2
 	arrow.Parent = triggerButton
 
 	-- 2. Создаем выпадающий контейнер
@@ -386,8 +386,10 @@ function FlexUI:AddSelect(elements, defaultValue)
 	contentFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
 	contentFrame.Visible = false
 	contentFrame.ClipsDescendants = true
-	contentFrame.Parent = self.MainFrame
-	self.ContentFrame = contentFrame -- ⚠️ Внимание: это перезаписывается при каждом новом селекте!
+	
+	-- ✅ ИСПРАВЛЕНИЕ 1: Повышаем ZIndex, чтобы список был ПОВЕРХ всех остальных кнопок
+	contentFrame.ZIndex = 10 
+	contentFrame.Parent = self.ContentFrame -- ⚠️ ВАЖНО: Тоже в ContentFrame
 	
 	local listLayout = Instance.new("UIListLayout")
 	listLayout.Padding = UDim.new(0, 2)
@@ -402,9 +404,8 @@ function FlexUI:AddSelect(elements, defaultValue)
 	-- 3. Объект для управления селектом
 	local SelectObject = {}
 	local optionButtons = {}
-    local previousValue = currentValue -- Сохраняем начальное значение как "предыдущее"
+    local previousValue = currentValue
 
-	-- Функция обновления визуала
 	local function updateHighlight()
 		for _, btn in ipairs(optionButtons) do
 			if btn.Name == tostring(currentValue) then
@@ -418,7 +419,6 @@ function FlexUI:AddSelect(elements, defaultValue)
 		triggerButton.Text = tostring(currentValue)
 	end
 
-    -- Вспомогательная функция для удаления по значению (исправление вашей ошибки)
     local function removeValueFromTable(arr, value)
         for i, v in ipairs(arr) do
             if v == value then
@@ -442,27 +442,28 @@ function FlexUI:AddSelect(elements, defaultValue)
 			optBtn.Text = tostring(element)
 			optBtn.AutoButtonColor = false
 			optBtn.LayoutOrder = i
+			
+			-- ✅ ИСПРАВЛЕНИЕ 2: Устанавливаем ZIndex для каждой опции
+			optBtn.ZIndex = 11 
+			
 			optBtn.Parent = contentFrame
 			
 			table.insert(optionButtons, optBtn)
 			
 			optBtn.MouseButton1Click:Connect(function()
-                -- ✅ ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ
-                previousValue = currentValue -- Запоминаем старое значение ПЕРЕД изменением
-				currentValue = element       -- Устанавливаем новое
+                previousValue = currentValue
+				currentValue = element
 				
 				updateHighlight()
 				SelectObject:Close()
 				
 				if SelectObject.OnChanged then
-                    -- Передаем (newValue, oldValue)
 					SelectObject.OnChanged(currentValue, previousValue)
 				end
 			end)
 		end
 	end
 
-	-- Логика открытия/закрытия
 	function SelectObject:Open()
 		isOpened = true
 		contentFrame.Visible = true
@@ -487,9 +488,8 @@ function FlexUI:AddSelect(elements, defaultValue)
 		SelectObject:Toggle()
 	end)
 
-	-- Публичные методы
 	function SelectObject:SetValue(val)
-        previousValue = currentValue -- Обновляем предыдущее значение и при программной смене
+        previousValue = currentValue
 		currentValue = val
 		updateHighlight()
         if SelectObject.OnChanged then
@@ -507,20 +507,16 @@ function FlexUI:AddSelect(elements, defaultValue)
 
 	function SelectObject:AddElement(element_value)
 		elements[#elements + 1] = element_value
-        -- Тут стоит пересоздать кнопку, но для простоты оставим как есть
-        -- В идеале нужно создать новый optBtn и добавить в optionButtons
 		updateHighlight()
 		return elements
 	end
 
 	function SelectObject:RemoveElementByIndex(element_index)
 		table.remove(elements, element_index)
-        -- Тут нужно удалить соответствующий optBtn из optionButtons и contentFrame
 		updateHighlight()
 	end
 
 	function SelectObject:RemoveElementByName(value)
-        -- Исправлено: используем локальную функцию вместо несуществующей глобальной
 		local status = removeValueFromTable(elements, value)
 		updateHighlight()
 		return status
@@ -529,13 +525,11 @@ function FlexUI:AddSelect(elements, defaultValue)
 	function SelectObject:SetElementsArray(new_elements)
 		elements = new_elements
         
-        -- Очистка старых кнопок
         for _, child in ipairs(contentFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
         optionButtons = {}
         
-        -- Пересоздание кнопок (упрощенно, лучше вынести генерацию в отдельную функцию)
         if elements and type(elements) == "table" then
             for i, element in ipairs(elements) do
                 local optBtn = Instance.new("TextButton")
@@ -548,6 +542,7 @@ function FlexUI:AddSelect(elements, defaultValue)
                 optBtn.Text = tostring(element)
                 optBtn.AutoButtonColor = false
                 optBtn.LayoutOrder = i
+                optBtn.ZIndex = 11
                 optBtn.Parent = contentFrame
                 table.insert(optionButtons, optBtn)
                 
@@ -564,7 +559,7 @@ function FlexUI:AddSelect(elements, defaultValue)
         end
 
 		currentValue = defaultValue or (elements and elements[1]) or ""
-        previousValue = currentValue -- Сбрасываем previousValue при полной замене списка
+        previousValue = currentValue
 		updateHighlight()
 	end
 	
