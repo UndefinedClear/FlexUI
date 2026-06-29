@@ -137,7 +137,7 @@ function FlexUI.new(_settings)
 	title.Text = settings.titleText or "DEBUG MENU"
 	title.TextColor3 = self.Theme.TitleText
 	title.Font = Enum.Font.GothamBold
-	title.TextSize = settings.titleTextSize
+	title.TextSize = self.Theme.titleTextSize
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = mainFrame
 	
