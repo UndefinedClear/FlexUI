@@ -360,7 +360,10 @@ if #teams:GetChildren() > 0 then
         TextColor = Color3.fromRGB(255, 200, 0)
     })
     
+    local select_team_to_change = menu:AddSelect()
+
     for _, team in ipairs(teams:GetChildren()) do
+        select_team_to_change:AddElement()
         menu:AddButton("В команду: " .. team.Name, function()
             player.Team = team
             print("[Team Switcher] Перешёл в:", team.Name)

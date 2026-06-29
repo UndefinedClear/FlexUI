@@ -751,7 +751,7 @@ function FlexUI:AddDestroyButton(customText, customColor, beforeDestroy)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(0, 235, 0, 35)
 	button.BackgroundColor3 = destroyColor
-	button.Text = customText or "Уничтожить меню"
+	button.Text = customText or "Destroy menu"
 	button.TextColor3 = Color3.fromRGB(255, 255, 255)
 	button.Font = Enum.Font.GothamBold
 	button.TextSize = 12
@@ -768,7 +768,7 @@ function FlexUI:AddDestroyButton(customText, customColor, beforeDestroy)
 		if type(beforeDestroy) == "function" then
 			local success, err = pcall(beforeDestroy)
 			if not success then
-				warn("[FlexUI] Ошибка в beforeDestroy:", err)
+				warn("[FlexUI] Error in beforeDestroy:", err)
 			end
 		end
 		self:Destroy()
@@ -814,7 +814,7 @@ function FlexUI:Destroy()
 	self.TargetSize = nil
 	self.IsVisible = nil
 	
-	print("[FlexUI] Память полностью очищена.")
+	print("[FlexUI] Menu have been disposed!")
 end
 
 return FlexUI
