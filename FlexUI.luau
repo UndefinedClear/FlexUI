@@ -46,16 +46,16 @@ local DefaultTheme = {
 	SelectOptionTextColor             = Color3.fromRGB(180, 180, 180)
 }
 
-local NeonTheme = {
-    CornerRadius = 10,
-    WindowBackground = Color3.fromRGB(15, 15, 20),
-    TitleText = Color3.fromRGB(0, 255, 150),
-    ButtonBackground = Color3.fromRGB(30, 30, 35),
-    ButtonHover = Color3.fromRGB(0, 255, 150),
-    ButtonText = Color3.fromRGB(255, 255, 255),
-    TriggerBackground = Color3.fromRGB(0, 255, 150),
-	titleTextSize = 10
-}
+-- local NeonTheme = {
+--     CornerRadius = 10,
+--     WindowBackground = Color3.fromRGB(15, 15, 20),
+--     TitleText = Color3.fromRGB(0, 255, 150),
+--     ButtonBackground = Color3.fromRGB(30, 30, 35),
+--     ButtonHover = Color3.fromRGB(0, 255, 150),
+--     ButtonText = Color3.fromRGB(255, 255, 255),
+--     TriggerBackground = Color3.fromRGB(0, 255, 150),
+-- 	titleTextSize = 7
+-- }
 
 -- 1. Таблица с дефолтными значениями
 local settings = {
@@ -137,7 +137,7 @@ function FlexUI.new(_settings)
 	title.Text = settings.titleText or "DEBUG MENU"
 	title.TextColor3 = self.Theme.TitleText
 	title.Font = Enum.Font.GothamBold
-	title.TextSize = settings.titleTextSize or 14
+	title.TextSize = settings.titleTextSize
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = mainFrame
 	
