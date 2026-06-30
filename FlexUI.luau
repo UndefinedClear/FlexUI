@@ -371,19 +371,20 @@ end
 
 --  in dev
 -- ====================== SELECT (FIXED) ======================
+-- ====================== FIXED SELECT (No Click Through) ======================
 function FlexUI:AddSelect(elements, defaultValue, callback)
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	local isOpen = false
 	local optionButtons = {}
 	local SelectObject = {}
 
-	-- Container
 	local container = Instance.new("Frame")
 	container.Size = UDim2.new(0, 235, 0, 35)
 	container.BackgroundTransparency = 1
+	container.ZIndex = 60
 	container.Parent = self.ContentFrame
 
-	-- Trigger Button
+	-- Trigger
 	local trigger = Instance.new("TextButton")
 	trigger.Size = UDim2.new(1, 0, 1, 0)
 	trigger.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
@@ -391,6 +392,7 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	trigger.TextColor3 = Color3.fromRGB(220, 220, 220)
 	trigger.Font = Enum.Font.Gotham
 	trigger.TextSize = 13
+	trigger.ZIndex = 61
 	trigger.Parent = container
 
 	local corner = Instance.new("UICorner")
@@ -405,6 +407,7 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
 	arrow.Font = Enum.Font.Gotham
 	arrow.TextSize = 14
+	arrow.ZIndex = 62
 	arrow.Parent = trigger
 
 	-- Dropdown
@@ -415,7 +418,7 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	dropdown.BorderSizePixel = 0
 	dropdown.ScrollBarThickness = 4
 	dropdown.Visible = false
-	dropdown.ZIndex = 100
+	dropdown.ZIndex = 200   -- Очень высокий ZIndex
 	dropdown.ClipsDescendants = true
 	dropdown.Parent = container
 
@@ -424,18 +427,14 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	listLayout.Parent = dropdown
 
-	local function updateHighlight()
-		for _, btn in ipairs(optionButtons) do
-			if btn.Text == tostring(currentValue) then
-				btn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-				btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			else
-				btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-				btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-			end
-		end
-		trigger.Text = tostring(currentValue)
-	end
+	-- Blocker (чтобы клики не проходили сквозь)
+	local blocker = Instance.new("TextButton")
+	blocker.Size = UDim2.new(1, 0, 1, 0)
+	blocker.BackgroundTransparency = 1
+	blocker.Text = ""
+	blocker.ZIndex = 199
+	blocker.Visible = false
+	blocker.Parent = container
 
 	local function refreshDropdown()
 		for _, child in ipairs(dropdown:GetChildren()) do
@@ -453,14 +452,15 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 				btn.Font = Enum.Font.Gotham
 				btn.TextSize = 13
 				btn.LayoutOrder = i
+				btn.ZIndex = 201
 				btn.Parent = dropdown
 				table.insert(optionButtons, btn)
 
 				btn.MouseButton1Click:Connect(function()
-					local oldValue = currentValue
+					local old = currentValue
 					currentValue = val
-					updateHighlight()
-					if callback then callback(currentValue, oldValue) end
+					trigger.Text = tostring(val)
+					if callback then callback(currentValue, old) end
 					SelectObject:Close()
 				end)
 			end
@@ -472,24 +472,30 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	trigger.MouseButton1Click:Connect(function()
 		isOpen = not isOpen
 		dropdown.Visible = isOpen
+		blocker.Visible = isOpen
 		arrow.Text = isOpen and "▲" or "▼"
+		
 		if isOpen then
 			local height = math.min(#elements * 30 + 4, 200)
-			dropdown:TweenSize(UDim2.new(1, 0, 0, height), "Out", "Quad", 0.2, true)
+			dropdown:TweenSize(UDim2.new(1, 0, 0, height), "Out", "Quad", 0.25, true)
+		else
+			dropdown:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.2, true)
 		end
 	end)
 
-	-- ==================== PUBLIC API ====================
+	-- Закрытие при клике вне
+	blocker.MouseButton1Click:Connect(function()
+		SelectObject:Close()
+	end)
+
+	-- ==================== API ====================
 	function SelectObject:SetValue(val)
-		local old = currentValue
 		currentValue = val
-		updateHighlight()
-		if callback then callback(currentValue, old) end
+		trigger.Text = tostring(val)
+		if callback then callback(val) end
 	end
 
-	function SelectObject:GetValue()
-		return currentValue
-	end
+	function SelectObject:GetValue() return currentValue end
 
 	function SelectObject:AddElement(value)
 		table.insert(elements, value)
@@ -507,50 +513,35 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 		return false
 	end
 
-	function SelectObject:RemoveElementByIndex(index)
-		if elements[index] then
-			table.remove(elements, index)
-			refreshDropdown()
-			return true
-		end
-		return false
-	end
-
 	function SelectObject:SetElementsArray(newArray)
 		elements = newArray or {}
 		refreshDropdown()
 		currentValue = elements[1] or ""
-		updateHighlight()
-	end
-
-	function SelectObject:GetElementsArray()
-		return elements
+		trigger.Text = tostring(currentValue)
 	end
 
 	function SelectObject:Open()
 		isOpen = true
 		dropdown.Visible = true
+		blocker.Visible = true
 		arrow.Text = "▲"
-		local height = math.min(#elements * 30 + 4, 200)
-		dropdown:TweenSize(UDim2.new(1, 0, 0, height), "Out", "Quad", 0.2, true)
+		local h = math.min(#elements * 30 + 4, 200)
+		dropdown:TweenSize(UDim2.new(1, 0, 0, h), "Out", "Quad", 0.25, true)
 	end
 
 	function SelectObject:Close()
 		isOpen = false
-		dropdown:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.15, true, function()
-			if not isOpen then dropdown.Visible = false end
-		end)
 		arrow.Text = "▼"
+		dropdown:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.2, true, function()
+			if not isOpen then 
+				dropdown.Visible = false 
+				blocker.Visible = false
+			end
+		end)
 	end
 
-	function SelectObject:Destroy()
-		container:Destroy()
-	end
+	function SelectObject:Destroy() container:Destroy() end
 
-	-- OnChanged callback support
-	SelectObject.OnChanged = callback
-
-	updateHighlight()
 	return SelectObject
 end
 
