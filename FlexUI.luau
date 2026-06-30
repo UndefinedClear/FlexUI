@@ -372,16 +372,16 @@ end
 --  in dev
 -- ====================== SELECT (FIXED) ======================
 -- ====================== FIXED SELECT (No Click Through) ======================
+-- ====================== ULTIMATE SELECT (100% visible) ======================
 function FlexUI:AddSelect(elements, defaultValue, callback)
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	local isOpen = false
-	local optionButtons = {}
 	local SelectObject = {}
 
 	local container = Instance.new("Frame")
 	container.Size = UDim2.new(0, 235, 0, 35)
 	container.BackgroundTransparency = 1
-	container.ZIndex = 60
+	container.ZIndex = 100
 	container.Parent = self.ContentFrame
 
 	-- Trigger
@@ -392,12 +392,12 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	trigger.TextColor3 = Color3.fromRGB(220, 220, 220)
 	trigger.Font = Enum.Font.Gotham
 	trigger.TextSize = 13
-	trigger.ZIndex = 61
+	trigger.ZIndex = 101
 	trigger.Parent = container
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6)
-	corner.Parent = trigger
+	local tCorner = Instance.new("UICorner")
+	tCorner.CornerRadius = UDim.new(0, 6)
+	tCorner.Parent = trigger
 
 	local arrow = Instance.new("TextLabel")
 	arrow.Size = UDim2.new(0, 25, 1, 0)
@@ -407,88 +407,71 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
 	arrow.Font = Enum.Font.Gotham
 	arrow.TextSize = 14
-	arrow.ZIndex = 62
+	arrow.ZIndex = 102
 	arrow.Parent = trigger
 
-	-- Dropdown
+	-- DROPDOWN (отдельный Frame на ScreenGui)
 	local dropdown = Instance.new("ScrollingFrame")
-	dropdown.Size = UDim2.new(1, 0, 0, 0)
-	dropdown.Position = UDim2.new(0, 0, 1, 5)
-	dropdown.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+	dropdown.Size = UDim2.new(0, 235, 0, 0)
+	dropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 	dropdown.BorderSizePixel = 0
-	dropdown.ScrollBarThickness = 4
+	dropdown.ScrollBarThickness = 5
 	dropdown.Visible = false
-	dropdown.ZIndex = 200   -- Очень высокий ZIndex
+	dropdown.ZIndex = 9999   -- Максимальный приоритет
 	dropdown.ClipsDescendants = true
-	dropdown.Parent = container
+	dropdown.Parent = self.ScreenGui  -- Важно! На ScreenGui, а не на контейнере
 
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.Padding = UDim.new(0, 2)
-	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Parent = dropdown
+	local list = Instance.new("UIListLayout")
+	list.Padding = UDim.new(0, 2)
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Parent = dropdown
 
-	-- Blocker (чтобы клики не проходили сквозь)
-	local blocker = Instance.new("TextButton")
-	blocker.Size = UDim2.new(1, 0, 1, 0)
-	blocker.BackgroundTransparency = 1
-	blocker.Text = ""
-	blocker.ZIndex = 199
-	blocker.Visible = false
-	blocker.Parent = container
-
-	local function refreshDropdown()
-		for _, child in ipairs(dropdown:GetChildren()) do
-			if child:IsA("TextButton") then child:Destroy() end
+	local function refresh()
+		for _, v in ipairs(dropdown:GetChildren()) do
+			if v:IsA("TextButton") then v:Destroy() end
 		end
-		optionButtons = {}
 
-		if elements and type(elements) == "table" then
+		if elements then
 			for i, val in ipairs(elements) do
 				local btn = Instance.new("TextButton")
-				btn.Size = UDim2.new(1, -4, 0, 28)
+				btn.Size = UDim2.new(1, -4, 0, 30)
 				btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 				btn.Text = tostring(val)
 				btn.TextColor3 = Color3.fromRGB(200, 200, 200)
 				btn.Font = Enum.Font.Gotham
 				btn.TextSize = 13
-				btn.LayoutOrder = i
-				btn.ZIndex = 201
+				btn.ZIndex = 10000
 				btn.Parent = dropdown
-				table.insert(optionButtons, btn)
 
 				btn.MouseButton1Click:Connect(function()
-					local old = currentValue
 					currentValue = val
 					trigger.Text = tostring(val)
-					if callback then callback(currentValue, old) end
+					if callback then callback(val) end
 					SelectObject:Close()
 				end)
 			end
 		end
 	end
 
-	refreshDropdown()
+	refresh()
 
 	trigger.MouseButton1Click:Connect(function()
 		isOpen = not isOpen
-		dropdown.Visible = isOpen
-		blocker.Visible = isOpen
-		arrow.Text = isOpen and "▲" or "▼"
 		
 		if isOpen then
-			local height = math.min(#elements * 30 + 4, 200)
-			dropdown:TweenSize(UDim2.new(1, 0, 0, height), "Out", "Quad", 0.25, true)
+			-- Позиционируем точно под триггером
+			local absPos = trigger.AbsolutePosition
+			dropdown.Position = UDim2.new(0, absPos.X, 0, absPos.Y + trigger.AbsoluteSize.Y + 5)
+			dropdown.Size = UDim2.new(0, 235, 0, math.min(#elements * 32, 220))
+			dropdown.Visible = true
+			arrow.Text = "▲"
 		else
-			dropdown:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.2, true)
+			dropdown.Visible = false
+			arrow.Text = "▼"
 		end
 	end)
 
-	-- Закрытие при клике вне
-	blocker.MouseButton1Click:Connect(function()
-		SelectObject:Close()
-	end)
-
-	-- ==================== API ====================
+	-- API
 	function SelectObject:SetValue(val)
 		currentValue = val
 		trigger.Text = tostring(val)
@@ -497,50 +480,20 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 
 	function SelectObject:GetValue() return currentValue end
 
-	function SelectObject:AddElement(value)
-		table.insert(elements, value)
-		refreshDropdown()
+	function SelectObject:SetElementsArray(newList)
+		elements = newList or {}
+		refresh()
 	end
 
-	function SelectObject:RemoveElementByName(value)
-		for i, v in ipairs(elements) do
-			if v == value then
-				table.remove(elements, i)
-				refreshDropdown()
-				return true
-			end
-		end
-		return false
+	function SelectObject:AddElement(val)
+		table.insert(elements, val)
+		refresh()
 	end
 
-	function SelectObject:SetElementsArray(newArray)
-		elements = newArray or {}
-		refreshDropdown()
-		currentValue = elements[1] or ""
-		trigger.Text = tostring(currentValue)
+	function SelectObject:Destroy()
+		container:Destroy()
+		dropdown:Destroy()
 	end
-
-	function SelectObject:Open()
-		isOpen = true
-		dropdown.Visible = true
-		blocker.Visible = true
-		arrow.Text = "▲"
-		local h = math.min(#elements * 30 + 4, 200)
-		dropdown:TweenSize(UDim2.new(1, 0, 0, h), "Out", "Quad", 0.25, true)
-	end
-
-	function SelectObject:Close()
-		isOpen = false
-		arrow.Text = "▼"
-		dropdown:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.2, true, function()
-			if not isOpen then 
-				dropdown.Visible = false 
-				blocker.Visible = false
-			end
-		end)
-	end
-
-	function SelectObject:Destroy() container:Destroy() end
 
 	return SelectObject
 end
