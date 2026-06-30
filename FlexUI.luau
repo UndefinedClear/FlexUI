@@ -370,10 +370,7 @@ end
 	-- self.Theme.SelectOptionTextColor = Color3.fromRGB(180, 180, 180)
 
 --  in dev
--- ====================== SELECT (FIXED) ======================
--- ====================== FIXED SELECT (No Click Through) ======================
--- ====================== ULTIMATE SELECT (100% visible) ======================
--- ====================== FINAL FIXED SELECT ======================
+-- ====================== FINAL WORKING SELECT ======================
 function FlexUI:AddSelect(elements, defaultValue, callback)
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	local isOpen = false
@@ -472,7 +469,7 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 		end
 	end)
 
-	-- ==================== METHODS ====================
+	-- Методы
 	function SelectObject:Close()
 		isOpen = false
 		dropdown.Visible = false
