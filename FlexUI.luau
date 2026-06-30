@@ -373,6 +373,7 @@ end
 -- ====================== SELECT (FIXED) ======================
 -- ====================== FIXED SELECT (No Click Through) ======================
 -- ====================== ULTIMATE SELECT (100% visible) ======================
+-- ====================== FINAL FIXED SELECT ======================
 function FlexUI:AddSelect(elements, defaultValue, callback)
 	local currentValue = defaultValue or (elements and elements[1]) or ""
 	local isOpen = false
@@ -410,25 +411,25 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 	arrow.ZIndex = 102
 	arrow.Parent = trigger
 
-	-- DROPDOWN (отдельный Frame на ScreenGui)
+	-- Dropdown
 	local dropdown = Instance.new("ScrollingFrame")
 	dropdown.Size = UDim2.new(0, 235, 0, 0)
 	dropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 	dropdown.BorderSizePixel = 0
-	dropdown.ScrollBarThickness = 5
+	dropdown.ScrollBarThickness = 4
 	dropdown.Visible = false
-	dropdown.ZIndex = 9999   -- Максимальный приоритет
+	dropdown.ZIndex = 9999
 	dropdown.ClipsDescendants = true
-	dropdown.Parent = self.ScreenGui  -- Важно! На ScreenGui, а не на контейнере
+	dropdown.Parent = self.ScreenGui
 
 	local list = Instance.new("UIListLayout")
 	list.Padding = UDim.new(0, 2)
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.Parent = dropdown
 
-	local function refresh()
-		for _, v in ipairs(dropdown:GetChildren()) do
-			if v:IsA("TextButton") then v:Destroy() end
+	local function refreshDropdown()
+		for _, child in ipairs(dropdown:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
 		end
 
 		if elements then
@@ -444,25 +445,25 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 				btn.Parent = dropdown
 
 				btn.MouseButton1Click:Connect(function()
+					local old = currentValue
 					currentValue = val
 					trigger.Text = tostring(val)
-					if callback then callback(val) end
+					if callback then callback(currentValue, old) end
 					SelectObject:Close()
 				end)
 			end
 		end
 	end
 
-	refresh()
+	refreshDropdown()
 
 	trigger.MouseButton1Click:Connect(function()
 		isOpen = not isOpen
-		
 		if isOpen then
-			-- Позиционируем точно под триггером
 			local absPos = trigger.AbsolutePosition
 			dropdown.Position = UDim2.new(0, absPos.X, 0, absPos.Y + trigger.AbsoluteSize.Y + 5)
-			dropdown.Size = UDim2.new(0, 235, 0, math.min(#elements * 32, 220))
+			local height = math.min(#(elements or {}) * 32, 220)
+			dropdown.Size = UDim2.new(0, 235, 0, height)
 			dropdown.Visible = true
 			arrow.Text = "▲"
 		else
@@ -471,23 +472,33 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 		end
 	end)
 
-	-- API
+	-- ==================== METHODS ====================
+	function SelectObject:Close()
+		isOpen = false
+		dropdown.Visible = false
+		arrow.Text = "▼"
+	end
+
 	function SelectObject:SetValue(val)
 		currentValue = val
 		trigger.Text = tostring(val)
 		if callback then callback(val) end
 	end
 
-	function SelectObject:GetValue() return currentValue end
+	function SelectObject:GetValue()
+		return currentValue
+	end
 
 	function SelectObject:SetElementsArray(newList)
 		elements = newList or {}
-		refresh()
+		refreshDropdown()
+		currentValue = elements[1] or ""
+		trigger.Text = tostring(currentValue)
 	end
 
 	function SelectObject:AddElement(val)
 		table.insert(elements, val)
-		refresh()
+		refreshDropdown()
 	end
 
 	function SelectObject:Destroy()
@@ -497,7 +508,6 @@ function FlexUI:AddSelect(elements, defaultValue, callback)
 
 	return SelectObject
 end
-
 -- ====================== NEW SLIDER ======================
 function FlexUI:AddSlider(text, min, max, default, callback)
 	local value = default or min
