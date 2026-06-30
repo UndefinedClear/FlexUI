@@ -13,6 +13,25 @@ function FlexUI.InfiniteYield()
 	loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
 end
 
+function FlexUI.SendNotification(title, text, dur, icon)
+	if dur == nil then
+		dur = 16
+	end
+
+	if icon == nil or icon == "" then
+		icon = "rbxthumb://type=Asset&id=5107182114&w=150&h=150"
+	end
+
+	game:GetService("StarterGui"):SetCore("SendNotification", { 
+		Title = title,
+		Text = text,
+		Icon = icon,
+		Duration = dur
+	})
+end
+
+
+
 -- ДЕФОЛТНАЯ ТЕМА
 local DefaultTheme = {
 	CornerRadius                      = 8,
@@ -351,242 +370,284 @@ end
 	-- self.Theme.SelectOptionTextColor = Color3.fromRGB(180, 180, 180)
 
 --  in dev
-function FlexUI:AddSelect(elements, defaultValue)
-	local isOpened = false
+-- ====================== SELECT (FIXED) ======================
+function FlexUI:AddSelect(elements, defaultValue, callback)
 	local currentValue = defaultValue or (elements and elements[1]) or ""
-	
-	-- 1. Кнопка-триггер
-	local triggerButton = Instance.new("TextButton")
-	triggerButton.Size = UDim2.new(1, 0, 0, 35)
-	triggerButton.BackgroundColor3 = self.Theme.SelectTriggerButtonColor
-	triggerButton.TextColor3 = self.Theme.SelectTriggerButtonTextColor
-	triggerButton.Font = Enum.Font.GothamMedium
-	triggerButton.TextSize = 14
-	triggerButton.Text = tostring(currentValue)
-	triggerButton.AutoButtonColor = false
-	
-	-- ✅ ИСПРАВЛЕНИЕ: Безопасное получение ContentFrame
-	-- Если self.ContentFrame потерян, ищем первый ScrollingFrame внутри MainFrame
-	local safeContentFrame = self.ContentFrame 
-	if not safeContentFrame or not safeContentFrame.Parent then
-		safeContentFrame = self.MainFrame:FindFirstChildOfClass("ScrollingFrame")
-	end
-	
-	triggerButton.Parent = safeContentFrame
-	
-	-- Стрелочка
+	local isOpen = false
+	local optionButtons = {}
+	local SelectObject = {}
+
+	-- Container
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(0, 235, 0, 35)
+	container.BackgroundTransparency = 1
+	container.Parent = self.ContentFrame
+
+	-- Trigger Button
+	local trigger = Instance.new("TextButton")
+	trigger.Size = UDim2.new(1, 0, 1, 0)
+	trigger.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+	trigger.Text = tostring(currentValue)
+	trigger.TextColor3 = Color3.fromRGB(220, 220, 220)
+	trigger.Font = Enum.Font.Gotham
+	trigger.TextSize = 13
+	trigger.Parent = container
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = trigger
+
 	local arrow = Instance.new("TextLabel")
-	arrow.Size = UDim2.new(0, 30, 1, 0)
-	arrow.Position = UDim2.new(1, -30, 0, 0)
+	arrow.Size = UDim2.new(0, 25, 1, 0)
+	arrow.Position = UDim2.new(1, -25, 0, 0)
 	arrow.BackgroundTransparency = 1
 	arrow.Text = "▼"
-	arrow.TextSize = 10
-	arrow.TextColor3 = self.Theme.SelectTriggerButtonArrowTextColor
-	arrow.Parent = triggerButton
+	arrow.TextColor3 = Color3.fromRGB(180, 180, 180)
+	arrow.Font = Enum.Font.Gotham
+	arrow.TextSize = 14
+	arrow.Parent = trigger
 
-	-- 2. Выпадающий список (поверх всего)
-	local dropdownFrame = Instance.new("ScrollingFrame")
-	dropdownFrame.Name = "Dropdown_" .. tostring(currentValue)
-	dropdownFrame.Size = UDim2.new(1, 0, 0, 0)
-	dropdownFrame.BackgroundTransparency = 1
-	dropdownFrame.BorderSizePixel = 0
-	dropdownFrame.ScrollBarThickness = 4
-	dropdownFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-	dropdownFrame.Visible = false
-	dropdownFrame.ClipsDescendants = true
-	dropdownFrame.ZIndex = 100 
-	dropdownFrame.Parent = self.MainFrame 
-	
+	-- Dropdown
+	local dropdown = Instance.new("ScrollingFrame")
+	dropdown.Size = UDim2.new(1, 0, 0, 0)
+	dropdown.Position = UDim2.new(0, 0, 1, 5)
+	dropdown.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+	dropdown.BorderSizePixel = 0
+	dropdown.ScrollBarThickness = 4
+	dropdown.Visible = false
+	dropdown.ZIndex = 100
+	dropdown.ClipsDescendants = true
+	dropdown.Parent = container
+
 	local listLayout = Instance.new("UIListLayout")
 	listLayout.Padding = UDim.new(0, 2)
-	listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Parent = dropdownFrame
-	
-	listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 4)
-	end) 
-
-	local SelectObject = {}
-	local optionButtons = {}
-    local previousValue = currentValue
+	listLayout.Parent = dropdown
 
 	local function updateHighlight()
 		for _, btn in ipairs(optionButtons) do
-			if btn.Name == tostring(currentValue) then
-				btn.BackgroundColor3 = self.Theme.SelectOptionActiveBGColor
-				btn.TextColor3 = self.Theme.SelectOptionActiveTextColor
+			if btn.Text == tostring(currentValue) then
+				btn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+				btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			else
-				btn.BackgroundColor3 = self.Theme.SelectOptionBGColor
-				btn.TextColor3 = self.Theme.SelectOptionTextColor
+				btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+				btn.TextColor3 = Color3.fromRGB(200, 200, 200)
 			end
 		end
-		triggerButton.Text = tostring(currentValue)
+		trigger.Text = tostring(currentValue)
 	end
 
-    local function removeValueFromTable(arr, value)
-        for i, v in ipairs(arr) do
-            if v == value then table.remove(arr, i); return true end
-        end
-        return false
-    end
+	local function refreshDropdown()
+		for _, child in ipairs(dropdown:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
+		end
+		optionButtons = {}
 
-	if elements and type(elements) == "table" then
-		for i, element in ipairs(elements) do
-			local optBtn = Instance.new("TextButton")
-			optBtn.Name = tostring(element)
-			optBtn.Size = UDim2.new(1, -4, 0, 28)
-			optBtn.BackgroundColor3 = self.Theme.SelectOptionBGColor
-			optBtn.TextColor3 = self.Theme.SelectOptionTextColor
-			optBtn.Font = Enum.Font.Gotham
-			optBtn.TextSize = 13
-			optBtn.Text = tostring(element)
-			optBtn.AutoButtonColor = false
-			optBtn.LayoutOrder = i
-			optBtn.ZIndex = 101
-			optBtn.Parent = dropdownFrame
-			
-			table.insert(optionButtons, optBtn)
-			
-			optBtn.MouseButton1Click:Connect(function()
-                previousValue = currentValue
-				currentValue = element
-				updateHighlight()
-				SelectObject:Close()
-				
-				if SelectObject.OnChanged then
-					SelectObject.OnChanged(currentValue, previousValue)
-				end
-			end)
+		if elements and type(elements) == "table" then
+			for i, val in ipairs(elements) do
+				local btn = Instance.new("TextButton")
+				btn.Size = UDim2.new(1, -4, 0, 28)
+				btn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+				btn.Text = tostring(val)
+				btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+				btn.Font = Enum.Font.Gotham
+				btn.TextSize = 13
+				btn.LayoutOrder = i
+				btn.Parent = dropdown
+				table.insert(optionButtons, btn)
+
+				btn.MouseButton1Click:Connect(function()
+					local oldValue = currentValue
+					currentValue = val
+					updateHighlight()
+					if callback then callback(currentValue, oldValue) end
+					SelectObject:Close()
+				end)
+			end
 		end
 	end
 
-	function SelectObject:Open()
-		isOpened = true
-		
-		-- ✅ БЕЗОПАСНЫЙ РАСЧЕТ ПОЗИЦИИ
-		-- Снова используем безопасный поиск контейнера
-		local currentContentFrame = self.ContentFrame 
-		if not currentContentFrame or not currentContentFrame.Parent then
-			currentContentFrame = self.MainFrame:FindFirstChildOfClass("ScrollingFrame")
-		end
+	refreshDropdown()
 
-		if not currentContentFrame then 
-			warn("[FlexUI] Error: Main ContentFrame not found!") 
-			return 
+	trigger.MouseButton1Click:Connect(function()
+		isOpen = not isOpen
+		dropdown.Visible = isOpen
+		arrow.Text = isOpen and "▲" or "▼"
+		if isOpen then
+			local height = math.min(#elements * 30 + 4, 200)
+			dropdown:TweenSize(UDim2.new(1, 0, 0, height), "Out", "Quad", 0.2, true)
 		end
+	end)
 
-		local mainList = currentContentFrame:FindFirstChildOfClass("UIListLayout")
-		local padding = mainList and mainList.Padding.Offset or 6 
-		
-		local offsetY = 0
-		for _, child in ipairs(currentContentFrame:GetChildren()) do
-			if child == triggerButton then break end 
-			if child:IsA("GuiObject") and child.Visible then
-				local h = child.AbsoluteSize.Y 
-				if not h then h = child.Size.Y.Offset end
-				offsetY = offsetY + h + padding
+	-- ==================== PUBLIC API ====================
+	function SelectObject:SetValue(val)
+		local old = currentValue
+		currentValue = val
+		updateHighlight()
+		if callback then callback(currentValue, old) end
+	end
+
+	function SelectObject:GetValue()
+		return currentValue
+	end
+
+	function SelectObject:AddElement(value)
+		table.insert(elements, value)
+		refreshDropdown()
+	end
+
+	function SelectObject:RemoveElementByName(value)
+		for i, v in ipairs(elements) do
+			if v == value then
+				table.remove(elements, i)
+				refreshDropdown()
+				return true
 			end
 		end
-		
-		local scrollOffset = currentContentFrame.CanvasPosition.Y
-		dropdownFrame.Position = UDim2.new(0, 0, 0, offsetY - scrollOffset + 35)
-		
-		dropdownFrame.Visible = true
-		local targetHeight = math.min(listLayout.AbsoluteContentSize.Y + 4, 200)
-		dropdownFrame:TweenSize(UDim2.new(1, 0, 0, targetHeight), "Out", "Quad", 0.2, true)
-		
-		arrow.Text = "▲"
+		return false
+	end
+
+	function SelectObject:RemoveElementByIndex(index)
+		if elements[index] then
+			table.remove(elements, index)
+			refreshDropdown()
+			return true
+		end
+		return false
+	end
+
+	function SelectObject:SetElementsArray(newArray)
+		elements = newArray or {}
+		refreshDropdown()
+		currentValue = elements[1] or ""
 		updateHighlight()
 	end
 
+	function SelectObject:GetElementsArray()
+		return elements
+	end
+
+	function SelectObject:Open()
+		isOpen = true
+		dropdown.Visible = true
+		arrow.Text = "▲"
+		local height = math.min(#elements * 30 + 4, 200)
+		dropdown:TweenSize(UDim2.new(1, 0, 0, height), "Out", "Quad", 0.2, true)
+	end
+
 	function SelectObject:Close()
-		isOpened = false
-		dropdownFrame:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.15, true, function()
-			if not isOpened then dropdownFrame.Visible = false end
+		isOpen = false
+		dropdown:TweenSize(UDim2.new(1, 0, 0, 0), "Out", "Quad", 0.15, true, function()
+			if not isOpen then dropdown.Visible = false end
 		end)
 		arrow.Text = "▼"
 	end
 
-	function SelectObject:Toggle()
-		if isOpened then self:Close() else self:Open() end
-	end
-
-	triggerButton.MouseButton1Click:Connect(function()
-		SelectObject:Toggle()
-	end)
-
-	function SelectObject:SetValue(val)
-        previousValue = currentValue
-		currentValue = val
-		updateHighlight()
-        if SelectObject.OnChanged then
-            SelectObject.OnChanged(currentValue, previousValue)
-        end
-	end
-
-	function SelectObject:GetValue() return currentValue end
-    function SelectObject:GetPreviousValue() return previousValue end
-
-	function SelectObject:AddElement(element_value)
-		elements[#elements + 1] = element_value
-	end
-
-	function SelectObject:RemoveElementByIndex(element_index)
-		table.remove(elements, element_index)
-	end
-
-	function SelectObject:RemoveElementByName(value)
-		return removeValueFromTable(elements, value)
-	end
-
-	function SelectObject:SetElementsArray(new_elements)
-		elements = new_elements
-        for _, child in ipairs(dropdownFrame:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
-        end
-        optionButtons = {}
-        
-        if elements and type(elements) == "table" then
-            for i, element in ipairs(elements) do
-                local optBtn = Instance.new("TextButton")
-                optBtn.Name = tostring(element)
-                optBtn.Size = UDim2.new(1, -4, 0, 28)
-                optBtn.BackgroundColor3 = self.Theme.SelectOptionBGColor
-                optBtn.TextColor3 = self.Theme.SelectOptionTextColor
-                optBtn.Font = Enum.Font.Gotham
-                optBtn.TextSize = 13
-                optBtn.Text = tostring(element)
-                optBtn.AutoButtonColor = false
-                optBtn.LayoutOrder = i
-                optBtn.ZIndex = 101
-                optBtn.Parent = dropdownFrame
-                table.insert(optionButtons, optBtn)
-                
-                optBtn.MouseButton1Click:Connect(function()
-                    previousValue = currentValue
-                    currentValue = element
-                    updateHighlight()
-                    SelectObject:Close()
-                    if SelectObject.OnChanged then SelectObject.OnChanged(currentValue, previousValue) end
-                end)
-            end
-        end
-		currentValue = defaultValue or (elements and elements[1]) or ""
-        previousValue = currentValue
-		updateHighlight()
-	end
-	
-	function SelectObject:GetElementsArray() return elements end
-
-
 	function SelectObject:Destroy()
-		triggerButton:Destroy()
-		dropdownFrame:Destroy()
+		container:Destroy()
 	end
+
+	-- OnChanged callback support
+	SelectObject.OnChanged = callback
 
 	updateHighlight()
 	return SelectObject
+end
+
+-- ====================== NEW SLIDER ======================
+function FlexUI:AddSlider(text, min, max, default, callback)
+	local value = default or min
+	local dragging = false
+
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(0, 235, 0, 50)
+	container.BackgroundTransparency = 1
+	container.Parent = self.ContentFrame
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 20)
+	label.BackgroundTransparency = 1
+	label.Text = text .. ": " .. tostring(value)
+	label.TextColor3 = Color3.fromRGB(220, 220, 220)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 13
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = container
+
+	local bar = Instance.new("Frame")
+	bar.Size = UDim2.new(1, 0, 0, 8)
+	bar.Position = UDim2.new(0, 0, 1, -12)
+	bar.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+	bar.Parent = container
+
+	local barCorner = Instance.new("UICorner")
+	barCorner.CornerRadius = UDim.new(1, 0)
+	barCorner.Parent = bar
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new(0, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+	fill.Parent = bar
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = fill
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Position = UDim2.new(0, 0, 0.5, -7)
+	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	knob.ZIndex = 2
+	knob.Parent = bar
+
+	local knobCorner = Instance.new("UICorner")
+	knobCorner.CornerRadius = UDim.new(1, 0)
+	knobCorner.Parent = knob
+
+	local function updateSlider()
+		local percent = (value - min) / (max - min)
+		fill.Size = UDim2.new(percent, 0, 1, 0)
+		knob.Position = UDim2.new(percent, -7, 0.5, -7)
+		label.Text = text .. ": " .. string.format("%.1f", value)
+		if callback then callback(value) end
+	end
+
+	local function slide(input)
+		local relative = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+		value = min + (max - min) * relative
+		updateSlider()
+	end
+
+	bar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			slide(input)
+		end
+	end)
+
+	bar.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			slide(input)
+		end
+	end)
+
+	updateSlider()
+
+	local SliderObj = {}
+	function SliderObj:SetValue(newVal)
+		value = math.clamp(newVal, min, max)
+		updateSlider()
+	end
+	function SliderObj:GetValue() return value end
+	function SliderObj:Destroy() container:Destroy() end
+
+	return SliderObj
 end
 
 function FlexUI:AddLabel(defaultText, options)
